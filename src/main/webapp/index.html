@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Scouting App</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 650px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        h2 { color: #333; }
+        .section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .section h3 {
+            margin-top: 0;
+            color: #555;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        select, input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        select:disabled { background-color: #eee; }
+        .question-pair {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 10px;
+            background-color: #fff;
+            border-radius: 5px;
+        }
+        .button-group { display: flex; gap: 10px; margin-top: 10px; }
+        button {
+            padding: 8px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+        .add-btn { background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 16px; }
+        .add-btn:hover { background-color: #45a049; }
+        .remove-btn { background-color: #f44336; color: white; }
+        .remove-btn:hover { background-color: #da190b; }
+        .submit-btn { background-color: #2196F3; color: white; padding: 12px 30px; font-size: 16px; margin-top: 20px; width: 100%; }
+        .submit-btn:hover { background-color: #0b7dda; }
+        .question-label {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+        }
+        .question-text {
+            background-color: #e8f0fe;
+            border: 1px solid #c5d0e6;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 5px 0 8px 0;
+            font-size: 14px;
+            color: #333;
+        }
+        .no-questions {
+            color: #888;
+            font-style: italic;
+            padding: 10px 0;
+        }
+        .admin-link { font-size: 13px; color: #e53935; text-decoration: none; float: right; margin-top: -30px; }
+        .admin-link:hover { text-decoration: underline; }
+        .logo-header { display: flex; align-items: center; gap: 12px; }
+        .logo-header img { width: 50px; height: 50px; object-fit: contain; }
+        .success-banner {
+            background-color: #e8f5e9;
+            border: 1px solid #a5d6a7;
+            color: #2e7d32;
+            padding: 12px 16px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+<div class="logo-header">
+    <img src="/scoutingapp/bee-logo.png" alt="Metal Jackets Bee Logo">
+    <h2>Metal Jackets Scouting App</h2>
+</div>
+<a href="#" class="admin-link" onclick="adminLogin(event)">&#9881; Admin</a>
+
+<div class="success-banner" id="successBanner">
+    ✅ Responses submitted successfully!
+</div>
+
+<form action="/scoutingapp/addQuestion" method="post" id="scoutForm">
+
+    <!-- STEP 1: Event, Team, Match dropdowns -->
+    <div class="section">
+        <h3>Step 1: Select Event, Team & Match</h3>
+
+        <label>Filter by State/Province:</label>
+        <select id="stateFilter" onchange="filterEvents()">
+            <option value="">-- All States/Provinces --</option>
+        </select>
+
+        <label>Event:</label>
+        <select name="event" id="eventSelect" onchange="loadTeamsAndMatches()">
+            <option value="">-- Loading events... --</option>
+        </select>
+
+        <label>Team Number:</label>
+        <select name="team" id="teamSelect" disabled>
+            <option value="">-- Select an event first --</option>
+        </select>
+
+        <label>Match Number:</label>
+        <select name="match" id="matchSelect" disabled>
+            <option value="">-- Select an event first --</option>
+        </select>
+    </div>
+
+    <!-- STEP 2: Answer the Questions -->
+    <div class="section">
+        <h3>Step 2: Answer the Questions</h3>
+        <div id="questionsContainer">
+            <p class="no-questions" id="noQuestionsMsg">Loading questions...</p>
+        </div>
+    </div>
+
+    <button type="submit" class="submit-btn">Submit All to Excel</button>
+</form>
+
+<script>
+    let allEvents = [];
+
+    function adminLogin(e) {
+        e.preventDefault();
+        const pwd = prompt('Enter admin password:');
+        if (pwd === null) return; // user hit Cancel
+        if (pwd === '2068') {
+            window.location.href = '/scoutingapp/admin.html';
+        } else {
+            alert('Incorrect password.');
+        }
+    }
+
+    // Show success banner if redirected back with ?submitted=true
+    if (window.location.search.includes('submitted=true')) {
+        document.getElementById('successBanner').style.display = 'block';
+        history.replaceState(null, '', window.location.pathname);
+    }
+
+    // On page load, fetch events AND questions in parallel
+    window.onload = function() {
+        // Load TBA events
+        fetch('/scoutingapp/tba/events/2026/simple')
+            .then(res => res.json())
+            .then(events => {
+                allEvents = events;
+                const states = [...new Set(events.map(e => e.state_prov).filter(Boolean))].sort();
+                const stateSelect = document.getElementById('stateFilter');
+                states.forEach(state => {
+                    const option = document.createElement('option');
+                    option.value = state;
+                    option.text = state;
+                    stateSelect.appendChild(option);
+                });
+
+                // Restore saved state filter first, then populate events
+                const savedState = sessionStorage.getItem('scout_state');
+                if (savedState) stateSelect.value = savedState;
+
+                const filtered = savedState ? events.filter(e => e.state_prov === savedState) : events;
+                populateEventDropdown(filtered);
+
+                // Restore saved event selection, then load teams/matches for it
+                const savedEvent = sessionStorage.getItem('scout_event');
+                if (savedEvent) {
+                    document.getElementById('eventSelect').value = savedEvent;
+                    loadTeamsAndMatches(
+                        sessionStorage.getItem('scout_team'),
+                        sessionStorage.getItem('scout_match')
+                    );
+                }
+            })
+            .catch(err => {
+                document.getElementById('eventSelect').innerHTML = '<option value="">-- Error loading events --</option>';
+                console.error('Error fetching events:', err);
+            });
+
+        // Load questions from admin-set list
+        fetch('/scoutingapp/admin/getQuestions')
+            .then(res => res.json())
+            .then(questions => {
+                const container = document.getElementById('questionsContainer');
+                const noMsg = document.getElementById('noQuestionsMsg');
+
+                if (questions.length === 0) {
+                    noMsg.textContent = 'No questions set yet. Ask your admin to add questions at the Admin page.';
+                    return;
+                }
+
+                noMsg.style.display = 'none';
+                container.innerHTML = '';
+
+                questions.forEach((q, i) => {
+                    const pair = document.createElement('div');
+                    pair.className = 'question-pair';
+                    pair.innerHTML = `
+                        <div class="question-label">Q${i + 1}.</div>
+                        <div class="question-text">${escapeHtml(q)}</div>
+                        <label>Your Answer:</label>
+                        <input type="text" name="answer" placeholder="Type your answer..." required>
+                    `;
+                    container.appendChild(pair);
+                });
+            })
+            .catch(() => {
+                document.getElementById('noQuestionsMsg').textContent =
+                    'Could not load questions. Make sure Tomcat is running and try refreshing.';
+            });
+    };
+
+    function escapeHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    function populateEventDropdown(events) {
+        events.sort((a, b) => a.name.localeCompare(b.name));
+        const select = document.getElementById('eventSelect');
+        select.innerHTML = '<option value="">-- Select an Event --</option>';
+        events.forEach(event => {
+            const option = document.createElement('option');
+            option.value = event.key;
+            option.text = event.name + ' (' + event.city + ', ' + event.state_prov + ')';
+            select.appendChild(option);
+        });
+    }
+
+    function filterEvents() {
+        const state = document.getElementById('stateFilter').value;
+        sessionStorage.setItem('scout_state', state);
+        // Clear downstream saved values when state changes
+        sessionStorage.removeItem('scout_event');
+        sessionStorage.removeItem('scout_team');
+        sessionStorage.removeItem('scout_match');
+        const filtered = state ? allEvents.filter(e => e.state_prov === state) : allEvents;
+        populateEventDropdown(filtered);
+        document.getElementById('teamSelect').innerHTML = '<option value="">-- Select an event first --</option>';
+        document.getElementById('teamSelect').disabled = true;
+        document.getElementById('matchSelect').innerHTML = '<option value="">-- Select an event first --</option>';
+        document.getElementById('matchSelect').disabled = true;
+    }
+
+    // When an event is selected, load its teams and matches
+    // restoreTeam / restoreMatch are optional values to reselect after loading
+    function loadTeamsAndMatches(restoreTeam, restoreMatch) {
+        const eventKey = document.getElementById('eventSelect').value;
+        const teamSelect = document.getElementById('teamSelect');
+        const matchSelect = document.getElementById('matchSelect');
+
+        if (!eventKey) {
+            teamSelect.innerHTML = '<option value="">-- Select an event first --</option>';
+            teamSelect.disabled = true;
+            matchSelect.innerHTML = '<option value="">-- Select an event first --</option>';
+            matchSelect.disabled = true;
+            sessionStorage.removeItem('scout_event');
+            sessionStorage.removeItem('scout_team');
+            sessionStorage.removeItem('scout_match');
+            return;
+        }
+
+        // Save event selection
+        sessionStorage.setItem('scout_event', eventKey);
+
+        // Load teams
+        teamSelect.innerHTML = '<option value="">-- Loading teams... --</option>';
+        teamSelect.disabled = true;
+        fetch('/scoutingapp/tba/event/' + eventKey + '/teams/simple')
+            .then(res => res.json())
+            .then(teams => {
+                teams.sort((a, b) => a.team_number - b.team_number);
+                teamSelect.innerHTML = '<option value="">-- Select a Team --</option>';
+                teams.forEach(team => {
+                    const option = document.createElement('option');
+                    option.value = team.team_number;
+                    option.text = team.team_number + ' - ' + team.nickname;
+                    teamSelect.appendChild(option);
+                });
+                teamSelect.disabled = false;
+                // Restore saved team if provided
+                if (restoreTeam) {
+                    teamSelect.value = restoreTeam;
+                }
+            })
+            .catch(err => {
+                teamSelect.innerHTML = '<option value="">-- Error loading teams --</option>';
+                console.error('Error fetching teams:', err);
+            });
+
+        // Load matches
+        matchSelect.innerHTML = '<option value="">-- Loading matches... --</option>';
+        matchSelect.disabled = true;
+        fetch('/scoutingapp/tba/event/' + eventKey + '/matches/simple')
+            .then(res => res.json())
+            .then(matches => {
+                matches.sort((a, b) => a.match_number - b.match_number);
+                matchSelect.innerHTML = '<option value="">-- Select a Match --</option>';
+                matches.forEach(match => {
+                    const option = document.createElement('option');
+                    option.value = match.key;
+                    option.text = match.comp_level.toUpperCase() + ' Match ' + match.match_number;
+                    matchSelect.appendChild(option);
+                });
+                matchSelect.disabled = false;
+                // Restore saved match if provided
+                if (restoreMatch) {
+                    matchSelect.value = restoreMatch;
+                }
+            })
+            .catch(err => {
+                matchSelect.innerHTML = '<option value="">-- Error loading matches --</option>';
+                console.error('Error fetching matches:', err);
+            });
+    }
+
+    // Save team/match selections whenever they change
+    document.getElementById('teamSelect').addEventListener('change', function() {
+        sessionStorage.setItem('scout_team', this.value);
+    });
+    document.getElementById('matchSelect').addEventListener('change', function() {
+        sessionStorage.setItem('scout_match', this.value);
+    });
+</script>
+
+</body>
+</html>

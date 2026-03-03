@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Scouting App - Admin</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 650px;
+            margin: 20px auto;
+            padding: 20px;
+        }
+        h2 { color: #333; }
+        .logo-header { display: flex; align-items: center; gap: 12px; }
+        .logo-header img { width: 50px; height: 50px; object-fit: contain; }
+        .admin-badge {
+            display: inline-block;
+            background-color: #e53935;
+            color: white;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        .section {
+            border: 1px solid #ddd;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f9f9f9;
+            border-radius: 5px;
+        }
+        .section h3 { margin-top: 0; color: #555; }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+            font-size: 14px;
+        }
+        .question-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        .question-row span {
+            min-width: 24px;
+            font-weight: bold;
+            color: #888;
+        }
+        .question-row input {
+            flex: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        button {
+            padding: 8px 15px;
+            font-size: 14px;
+            cursor: pointer;
+            border: none;
+            border-radius: 4px;
+        }
+        .add-btn { background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 15px; }
+        .add-btn:hover { background-color: #45a049; }
+        .remove-btn { background-color: #f44336; color: white; padding: 6px 12px; }
+        .remove-btn:hover { background-color: #da190b; }
+        .save-btn { background-color: #e53935; color: white; padding: 12px 30px; font-size: 16px; margin-top: 20px; width: 100%; }
+        .save-btn:hover { background-color: #b71c1c; }
+        .nav-link { display: inline-block; margin-top: 20px; color: #2196F3; text-decoration: none; font-size: 14px; }
+        .nav-link:hover { text-decoration: underline; }
+        .success-banner {
+            background-color: #e8f5e9;
+            border: 1px solid #a5d6a7;
+            color: #2e7d32;
+            padding: 12px 16px;
+            border-radius: 5px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .current-questions {
+            background-color: #fff3e0;
+            border: 1px solid #ffcc80;
+            border-radius: 5px;
+            padding: 12px 16px;
+            margin-bottom: 15px;
+            font-size: 13px;
+            color: #555;
+        }
+        .current-questions strong { color: #e65100; }
+        .current-questions ol { margin: 8px 0 0 0; padding-left: 20px; }
+    </style>
+</head>
+<body>
+
+<div class="logo-header">
+    <img src="/scoutingapp/bee-logo.png" alt="Metal Jackets Bee Logo">
+    <h2>Metal Jackets Scouting App <span class="admin-badge">ADMIN</span></h2>
+</div>
+
+<div class="success-banner" id="successBanner">
+    ✅ Questions saved successfully! Scouts can now see them on the <a href="/scoutingapp/">scouting page</a>.
+</div>
+
+<!-- Current questions already saved -->
+<div class="current-questions" id="currentQuestionsBox" style="display:none">
+    <strong>Currently saved questions:</strong>
+    <ol id="currentQuestionsList"></ol>
+</div>
+
+<form action="/scoutingapp/admin/saveQuestions" method="post" id="adminForm">
+    <div class="section">
+        <h3>Set Scouting Questions</h3>
+        <p style="color:#666; font-size:13px; margin-top:0">
+            Enter the questions scouts will see and answer during a match. Click <strong>Save Questions</strong> when done - scouts will immediately see the updated list.
+        </p>
+
+        <div id="questionsContainer">
+            <div class="question-row">
+                <span>1.</span>
+                <input type="text" name="question" placeholder="e.g. How many game pieces did the robot score?" required>
+                <button type="button" class="remove-btn" onclick="removeQuestion(this)">Remove</button>
+            </div>
+        </div>
+
+        <button type="button" class="add-btn" onclick="addQuestion()" style="margin-top:10px">+ Add Question</button>
+    </div>
+
+    <button type="submit" class="save-btn">💾 Save Questions</button>
+</form>
+
+<a href="/scoutingapp/" class="nav-link">← Go to Scouting Page</a>
+
+<script>
+    // Show success banner if redirected back with ?saved=true
+    if (window.location.search.includes('saved=true')) {
+        document.getElementById('successBanner').style.display = 'block';
+        // Clean URL without reload
+        history.replaceState(null, '', window.location.pathname);
+    }
+
+    // Load and display the currently saved questions on page load
+    window.onload = function() {
+        fetch('/scoutingapp/admin/getQuestions')
+            .then(res => res.json())
+            .then(questions => {
+                if (questions.length > 0) {
+                    const box = document.getElementById('currentQuestionsBox');
+                    const list = document.getElementById('currentQuestionsList');
+                    list.innerHTML = '';
+                    questions.forEach(q => {
+                        const li = document.createElement('li');
+                        li.textContent = q;
+                        list.appendChild(li);
+                    });
+                    box.style.display = 'block';
+
+                    // Also pre-fill the edit form with current questions
+                    const container = document.getElementById('questionsContainer');
+                    container.innerHTML = '';
+                    questions.forEach((q, i) => {
+                        const row = document.createElement('div');
+                        row.className = 'question-row';
+                        row.innerHTML = `
+                            <span>${i + 1}.</span>
+                            <input type="text" name="question" value="${escapeHtml(q)}" required>
+                            <button type="button" class="remove-btn" onclick="removeQuestion(this)">Remove</button>
+                        `;
+                        container.appendChild(row);
+                    });
+                }
+            })
+            .catch(() => {}); // Silently ignore if no questions yet
+    };
+
+    function escapeHtml(str) {
+        return str.replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    function addQuestion() {
+        const container = document.getElementById('questionsContainer');
+        const num = container.children.length + 1;
+        const row = document.createElement('div');
+        row.className = 'question-row';
+        row.innerHTML = `
+            <span>${num}.</span>
+            <input type="text" name="question" placeholder="Enter question..." required>
+            <button type="button" class="remove-btn" onclick="removeQuestion(this)">Remove</button>
+        `;
+        container.appendChild(row);
+        renumberRows();
+    }
+
+    function removeQuestion(button) {
+        const container = document.getElementById('questionsContainer');
+        if (container.children.length > 1) {
+            button.parentElement.remove();
+            renumberRows();
+        } else {
+            alert('You must keep at least one question!');
+        }
+    }
+
+    function renumberRows() {
+        const rows = document.querySelectorAll('.question-row');
+        rows.forEach((row, i) => {
+            row.querySelector('span').textContent = (i + 1) + '.';
+        });
+    }
+</script>
+</body>
+</html>

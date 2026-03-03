@@ -1,0 +1,45 @@
+# ============================
+# SECRET FILES - NEVER COMMIT
+# ============================
+.env
+*.env
+
+# ============================
+# MAVEN BUILD OUTPUT
+# ============================
+target/
+
+# ============================
+# JAVA COMPILED FILES
+# ============================
+*.class
+*.jar
+*.war
+
+# ============================
+# IDE FILES
+# ============================
+.vscode/
+.idea/
+*.iml
+
+# ============================
+# MAC OS FILES
+# ============================
+.DS_Store
+
+# ============================
+# EXCEL TEMP FILES
+# ============================
+~$*.xlsx
+~$*.xls
+
+# ============================
+# MISC ROOT FILES
+# ============================
+# Excel data file (lives in ~/Documents, not in repo)
+*.xlsx
+*.xls
+# Stray files at project root
+web:index.html
+ClearTestData.java
