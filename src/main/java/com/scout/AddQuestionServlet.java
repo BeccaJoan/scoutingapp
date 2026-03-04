@@ -21,11 +21,12 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 @WebServlet({"/addQuestion", "/tba/*"})
 public class AddQuestionServlet extends HttpServlet {
 
-    // Read the TBA API key from the .env file at project root
+    // Read the TBA API key from ~/.env (user's home directory)
     private String getTBAKey() {
         try {
-            String envPath = System.getProperty("user.home") + 
-                "/Documents/Sources/scoutingapp/scoutingapp/.env";
+            // Look for .env in the user's home directory (~/.env)
+            // This works regardless of where the project was cloned
+            String envPath = System.getProperty("user.home") + "/.env";
             for (String line : Files.readAllLines(Paths.get(envPath))) {
                 if (line.startsWith("TBA_API_KEY=")) {
                     return line.substring("TBA_API_KEY=".length()).trim();
